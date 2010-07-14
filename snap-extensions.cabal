@@ -1,0 +1,41 @@
+name:            snap-extensions
+version:         0.1
+synopsis:        Components for enhancing Snap applications
+description:
+  A collection of extensions use with the Snap web application framework.
+license:         BSD3
+license-file:    LICENSE
+author:          Shane O'Brien
+maintainer:      shane@duairc.com
+build-type:      Simple
+cabal-version:   >= 1.2
+homepage:        http://github.com/duairc/snap-extensions
+category:        Web
+
+extra-source-files:
+  CONTRIBUTORS,
+  LICENSE,
+  README.md
+
+
+Library
+  hs-source-dirs: src
+
+  exposed-modules:
+    Snap.Extension,
+    Snap.Extension.Server,
+    Snap.Extension.Server.Hint
+
+  other-modules:
+--  Snap.Extension.Heist
+
+  build-depends:
+    base >= 4 && < 5,
+    bytestring,
+    MonadCatchIO-transformers >= 0.2.1 && < 0.3,
+    monads-fd,
+--  heist >= 0.2,
+    snap >= 0.3 && < 0.4,
+    snap-core >= 0.3 && < 0.4,
+    snap-server >= 0.3 && < 0.4,
+    utf8-string
