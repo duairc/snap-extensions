@@ -28,6 +28,7 @@ module Snap.Extension.Server
   ) where
 
 import           Control.Applicative
+import           Control.Arrow
 import           Control.Exception (SomeException)
 import           Control.Monad
 import           Control.Monad.CatchIO
@@ -39,8 +40,6 @@ import           Prelude hiding (catch)
 import           Snap.Extension
 #ifdef HINT
 import           Snap.Loader.Hint
-#else
-import           Snap.Loader.Static
 #endif
 import           Snap.Http.Server (simpleHttpServe, setUnicodeLocale)
 import qualified Snap.Http.Server.Config as C
@@ -116,13 +115,18 @@ httpServe :: ConfigExtend s
 httpServe config runner handler = do
     (state, mkCleanup, mkSnap) <-
         runRunnerHint verbose runner (catch500 handler) reloader
+#ifdef HINT
     (cleanup, snap) <-
         $(loadSnapTH 'state 'mkCleanup 'mkSnap)
+#else
+    (cleanup, snap) <- fmap (mkCleanup &&& mkSnap) state
+#endif
     let site = compress $ snap
     output $ concat ["Listening on ", U.toString address, ":", show port]
     _   <- try $ serve $ site :: IO (Either SomeException ())
+    putStr "\n"
     cleanup
-    output "\nShutting down..."
+    output "Shutting down..."
   where
     handle   :: SomeException -> IO ()
     handle e = print e
