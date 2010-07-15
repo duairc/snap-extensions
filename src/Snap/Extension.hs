@@ -58,9 +58,9 @@ newtype Runner s = Runner
 -- | Values of types which are instances of 'RunnerState' have
 -- cleanup\/destroy and reload actions associated with them.
 class RunnerState s where
+    extensionId :: s -> ByteString
     mkCleanup   :: s -> IO ()
     mkReload    :: s -> IO ()
-    extensionId :: s -> ByteString
 
 
 ------------------------------------------------------------------------------

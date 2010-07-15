@@ -23,18 +23,16 @@ Library
 
   exposed-modules:
     Snap.Extension,
+    Snap.Extension.Heist
     Snap.Extension.Server,
     Snap.Extension.Server.Hint
-
-  other-modules:
---  Snap.Extension.Heist
 
   build-depends:
     base >= 4 && < 5,
     bytestring,
     MonadCatchIO-transformers >= 0.2.1 && < 0.3,
     monads-fd,
---  heist >= 0.2,
+    heist >= 0.2,
     snap >= 0.3 && < 0.4,
     snap-core >= 0.3 && < 0.4,
     snap-server >= 0.3 && < 0.4,
