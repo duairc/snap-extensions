@@ -44,7 +44,7 @@ including the state needed by the extensions we're using.
 
 At the same time, we also define the monad for our application, `App`, as a
 type alias to `SnapExtend AppState`. `SnapExtend` is a `MonadSnap` and a
-`MonadReader`, whose environment is a user-supplied type; in our case,
+`MonadReader`, whose environment is a given type; in our case,
 `AppState`.
 
     module App where
@@ -172,20 +172,58 @@ is provided. The first arguments are the same as in `runRunner`. The
 additional third argument is to do with reload handling; if you would like the
 same behaviour as the above example using `runRunner`, then you would pass
 `path "admin/reload" . defaultReloadHandler` as that argument. If you don't
-want to a web handler for reloading Snap Extensions at all, you could just
-pass `nullReloadHandler` as the argument.
+want to a web handler for reloading Snap Extensions at all, just pass
+`nullReloadHandler` as the argument.
 
 The tuple it returns contains all the arguments you need to pass to
 `loadSnapTH`. An example of the use of `runRunnerHint` is given below:
 
+    import Snap.Http.Server
+    
     main :: IO ()
     main = do
-        (state,mkCleanup,mkSnap) <-
+        (state, mkCleanup, mkSnap) <-
             runRunnerHint appRunner site $ path "admin/reload" . defaultReloadHandler
 
-        (cleanup,snap) <- $(loadSnapTH 'state 'mkCleanup 'mkSnap)
+        (cleanup, snap) <- $(loadSnapTH 'state 'mkCleanup 'mkSnap)
         quickHttpServe snap
         cleanup
+
+### Simplified Snap Extension server
+
+All of the above is kinda messy, so Snap Extensions provides another module,
+`Snap.Extension.Server`, which provides an interface mimicking that of
+`Snap.Http.Server` (their function names clash, so if you need to use both of
+them in the same module, use a qualified import). Using this module, the above
+application becomes:
+
+    import Snap.Extension.Server
+    
+    main :: IO ()
+    main = quickHttpServe appRunner site
+
+That's much better, isn't it? All it needs is a `Runner AppState` and an
+`App ()` and it's ready to go. You might be wondering what happened to all
+the reload handler nonsense we had before? That stuff has been absorbed into
+the config for the server. `quickHttpServe` of course doesn't take a config,
+it uses the defaults augmented with any options specified on the command-line.
+The default reload handler is `path "admin/reload" . defaultReloadHandler`.
+If you wanted to change this to `nullReloadHandler`, this is what you would
+do:
+
+    import Snap.Extension.Server
+    
+    main :: IO ()
+    main = do
+        config <- commandLineConfig emptyConfig
+        httpServe (setReloadHandler nullReloadHandler config) appRunner site
+
+This behaves exactly as the above example apart from the reload handler.
+
+Finally, if you wanted to turn the above application into one that used Hint,
+simply import `Snap.Extension.Server.Hint` instead of `Snap.Extension.Server`.
+The modules' interfaces are identical and no other changes to your code are
+needed.
 
 ## Developing Snap Extensions
 
