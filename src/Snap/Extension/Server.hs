@@ -114,16 +114,18 @@ httpServe :: ConfigExtend s
           -- ^ The application to be served
           -> IO ()
 httpServe config runner handler = do
-    output $ concat ["Listening on ", U.toString address, ":", show port]
     (state, mkCleanup, mkSnap) <-
         runRunnerHint verbose runner (catch500 handler) reloader
     (cleanup, snap) <-
         $(loadSnapTH 'state 'mkCleanup 'mkSnap)
     let site = compress $ snap
+    output $ concat ["Listening on ", U.toString address, ":", show port]
     _   <- try $ serve $ site :: IO (Either SomeException ())
     cleanup
     output "\nShutting down..."
   where
+    handle   :: SomeException -> IO ()
+    handle e = print e
     conf     = completeConfig config
     verbose  = fromJust $ getVerbose conf
     output   = when verbose . hPutStrLn stderr

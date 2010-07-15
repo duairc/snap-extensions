@@ -120,15 +120,17 @@ runRunnerHint :: Bool
               -- ^ See README and 'defaultReloadHandler'
               -> IO (IO s, s -> IO (), s -> Snap ())
               -- ^ A tuple of values which can be passed to @loadSnapTH@.
-runRunnerHint v (Runner r) (SnapExtend m) f = r v >>= \e -> case e of
+runRunnerHint v (Runner r) se@(SnapExtend m) f = r v >>= \e -> case e of
     Left s          -> return (return s, const $ return (), runReaderT m)
-    Right (s, a, b) -> let (SnapExtend m') = f b <|> (SnapExtend m)
+    Right (s, a, b) -> let (SnapExtend m') = f b <|> se
                        in return (return s, const a, runReaderT m')
 
 
 ------------------------------------------------------------------------------
 instance Functor Runner where
-    fmap = liftM
+    fmap f (Runner r) = Runner $ \v -> r v >>= \e -> return $ case e of
+        Left s          -> Left $ f s
+        Right (s, a, b) -> Right (f s, a, b)
 
 
 ------------------------------------------------------------------------------

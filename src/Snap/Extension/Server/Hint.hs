@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-#define HINT .Hint
+#define HINT
 #include "../Server.hs"

@@ -1,5 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+
+'Snap.Extension.Heist' is a Snap extension that makes it easy to use Heist
+templates with your Snap application. See the README for details.
+
+-}
+
 module Snap.Extension.Heist
   ( MonadHeist(..)
   , heistServe
