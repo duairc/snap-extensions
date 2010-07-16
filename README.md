@@ -227,4 +227,4 @@ needed.
 
 ## Developing Snap Extensions
 
-See `src/Snap/Extensions/Heist.hs` for an example of a Snap extension.
+See `src/Snap/Extensions/Timer.hs` for a simple example of a Snap extension.

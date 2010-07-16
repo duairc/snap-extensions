@@ -24,6 +24,7 @@ Library
   exposed-modules:
     Snap.Extension,
     Snap.Extension.Heist,
+    Snap.Extension.Less,
     Snap.Extension.Timer,
     Snap.Extension.Server,
     Snap.Extension.Server.Hint
@@ -31,10 +32,14 @@ Library
   build-depends:
     base >= 4 && < 5,
     bytestring,
+    containers,
+    directory,
+    directory-tree,
     MonadCatchIO-transformers >= 0.2.1 && < 0.3,
     monads-fd,
     heist >= 0.2,
     hexpat >= 0.16 && < 0.17,
+    process,
     snap >= 0.3 && < 0.4,
     snap-core >= 0.3 && < 0.4,
     snap-server >= 0.3 && < 0.4,
