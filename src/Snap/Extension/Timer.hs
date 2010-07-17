@@ -6,6 +6,11 @@
 'startTime' to your application's monad which simply returns the time at which
 the application was last loaded.
 
+Two splices, 'startTimeSplice' and 'currentTimeSplice' are also provided, for
+your convenience.
+
+This extension does not depend on any other extensions.
+
 -}
 
 module Snap.Extension.Timer

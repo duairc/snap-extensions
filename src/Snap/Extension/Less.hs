@@ -6,6 +6,8 @@ This Snap extension makes it easy to use LessCSS stylesheets in your Snap
 application. See http:\/\/lesscss.org\/. The operations you're interested in
 are probably 'lessServe' and 'lessServeSingle'.
 
+This extension does not depend on any other extensions.
+
 -}
 
 module Snap.Extension.Less
@@ -41,11 +43,11 @@ import           System.Process
 -- | The 'MonadLess' typeclass. It adds the operations 'lessServe' and
 -- 'lessServeSingle' to your monad.
 class MonadSnap m => MonadLess m where
-    -- | Analogous to 'fileServe'. If the template specified in the request
+    -- | Analogous to 'fileServe'. If the stylesheet specified in the request
     -- path is not found, it returns 'empty'.
     lessServe       :: m ()
 
-    -- | Analogous to 'fileServeSingle'. If the given template is not found,
+    -- | Analogous to 'fileServeSingle'. If the given stylesheet is not found,
     -- this throws an error.
     lessServeSingle :: ByteString -> m ()
 

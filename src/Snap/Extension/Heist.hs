@@ -3,7 +3,17 @@
 {-|
 
 'Snap.Extension.Heist' is a Snap extension that makes it easy to use Heist
-templates with your Snap application. See the README for details.
+templates with your Snap application. It extends your monad with the
+operations 'heistServe', 'heistServeSingle', 'heistLocal' and 'render'.
+
+It is important to note that the 'HeistState' type exported is of kind
+@(* -> *) -> *@, as opposed to @*@ which is the norm for @-State@ types. The
+type argument you should give to 'HeistState' is your application's monad, or
+more specifically, @m@, where @Splice m@ is the type of the splices you wish
+to bind to 'HeistState'. To bind splices to the 'HeistState', use
+'heistLocal (bindSplices mySplices)'.
+
+This extension does not depend on any other extensions.
 
 -}
 
@@ -116,16 +126,14 @@ instance MonadSnap m => RunnerState (HeistState m) where
 
 
 ------------------------------------------------------------------------------
--- | The runner for the Heist extension. It takes a path to your template
--- directory and an initial 'TemplateState' (maybe 'emptyTemplateState' with
--- some bound custom splices) as its arguments.
-heistRunner :: MonadSnap m
-            => FilePath -> TemplateState m -> Runner (HeistState m)
-heistRunner path origTs = do
+-- | The runner for the Heist extension. It takes a path to a template
+-- directory containing @.tpl@ files.
+heistRunner :: MonadSnap m => FilePath -> Runner (HeistState m)
+heistRunner path = do
     heistState <- liftIO $ do
-        (staticTs,sts) <- bindStaticTag origTs
-        ets <- loadTemplates path staticTs
+        (origTs,sts) <- bindStaticTag emptyTemplateState
+        ets <- loadTemplates path origTs
         flip (either error) ets $ \ts -> do
             tsMVar <- newMVar ts
-            return $ HeistState path staticTs tsMVar sts id
+            return $ HeistState path origTs tsMVar sts id
     mkRunner heistState

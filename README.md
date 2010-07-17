@@ -109,12 +109,10 @@ type. We must construct a runner type for our `-State` type, `AppState`. A
 `Runner` monad is provided to make it easy to do this. For your convenience,
 `Runner` is an instance of `MonadIO`.
 
-    import Text.Templating.Heist
-    
     appRunner :: Runner AppState
     appRunner = do
         db <- dbPoolRunner $ connectPostgreSQL "user=dbuser pass=sekrit"
-        hs <- heistRunner "resources/templates" emptyTemplateState
+        hs <- heistRunner "resources/templates"
         return $ AppState db hs
 
 In addition to constructing the `AppState`, the `Runner` monad also constructs

@@ -23,6 +23,7 @@ Library
 
   exposed-modules:
     Snap.Extension,
+    Snap.Extension.DBPool,
     Snap.Extension.Heist,
     Snap.Extension.Less,
     Snap.Extension.Timer,
@@ -37,6 +38,7 @@ Library
     directory-tree,
     MonadCatchIO-transformers >= 0.2.1 && < 0.3,
     monads-fd,
+    HDBC >= 2,
     heist >= 0.2,
     hexpat >= 0.16 && < 0.17,
     process,
