@@ -7,7 +7,7 @@ user authentication, templating and database connection pooling.
 ## Included Extensions
 
 <dl>
-  <dt><code>Snap.Extension.DBPool</code></dt>
+  <dt><code>Snap.Extension.ConnectionPool</code></dt>
   <dd>Gives applications which need a HDBC `Connection` efficient pooling for
     free.
   </dd>
@@ -51,14 +51,14 @@ type alias to `SnapExtend AppState`. `SnapExtend` is a `MonadSnap` and a
     
     import Database.HDBC.Postgresql
     import Snap.Extension
-    import Snap.Extension.DBPool
+    import Snap.Extension.ConnectionPool
     import Snap.Extension.Heist
     import Snap.Types
     
     type App = SnapExtend AppState
     
     data AppState = AppState
-        { dbPoolState :: DBPoolState Connection
+        { connectionPoolState :: ConnectionPoolState Connection
         , heistState  :: HeistState App
         }
 
@@ -88,20 +88,20 @@ doesn't it? We just have to tell the Heist extension how to find the
         getHeistState = heistState
         setHeistState hs as = as { heistState = hs }
 
-And similarly for our `DBPoolState`:
+And similarly for our `ConnectionPoolState`:
 
-    instance HasDBPoolState AppState where
-        getDBPoolState = dbPoolState
-        setDBPoolState dbps as = as { dbPoolState = dbps }
+    instance HasConnectionPoolState AppState where
+        getConnectionPoolState = connectionPoolState
+        setConnectionPoolState dbps as = as { connectionPoolState = dbps }
 
 With these instances, our application's monad `App` is now a `MonadHeist` and
-a `MonadDBPool`, giving it access to operations like
+a `MonadConnectionPool`, giving it access to operations like
 `render :: MonadHeist m => ByteString -> m ()` and
-`withConnection :: MonadDBPool m => (Connection -> IO a) -> m a`.
+`withConnection :: MonadConnectionPool m => (Connection -> IO a) -> m a`.
 
 ### Define the Runner for `AppState`
 
-So, our monad is now a `MonadHeist` and a `MonadDBPool`, but how do we
+So, our monad is now a `MonadHeist` and a `MonadConnectionPool`, but how do we
 actually construct our `AppState` and turn an `App ()` into a `Snap ()`? Snap
 extensions has a thing called a "Runner" that does these things. Each
 implementation of a Snap extenion interface provides a Runner for its `-State`
@@ -111,7 +111,7 @@ type. We must construct a runner type for our `-State` type, `AppState`. A
 
     appRunner :: Runner AppState
     appRunner = do
-        db <- dbPoolRunner $ connectPostgreSQL "user=dbuser pass=sekrit"
+        db <- connectionPoolRunner $ connectPostgreSQL "user=dbuser pass=sekrit"
         hs <- heistRunner "resources/templates"
         return $ AppState db hs
 
@@ -123,9 +123,9 @@ much as possible, otherwise they may be reloaded and destroyed in the wrong
 order. The "right" order is an order where every extension's dependencies are
 initialised before that extension. For example,
 `Snap.Extension.Session.HDBC` would depend on something which would extend the
-monad with `MonadDBPool`, i.e., `Snap.Extension.DBPool`. If you had this
-configuration it would be important that you put the `dbPoolRunner` before
-the `sessionRunner` in your `appRunner`.
+monad with `MonadConnectionPool`, i.e., `Snap.Extension.ConnectionPool`.
+If you had this configuration it would be important that you put the
+`connectionPoolRunner` before the `sessionRunner` in your `appRunner`.
 
 This `Runner AppState` can then be passed to `runRunner`, whose type signature
 is

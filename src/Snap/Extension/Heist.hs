@@ -77,7 +77,9 @@ heistServeSingle t = render t <|>
 
 
 ------------------------------------------------------------------------------
-instance HasHeistState s (SnapExtend s) => MonadHeist (SnapExtend s) (SnapExtend s) where
+instance
+    HasHeistState s (SnapExtend s) => MonadHeist (SnapExtend s) (SnapExtend s)
+  where
     render t     = do
         (HeistState _ _ tsMVar _ modifier) <- asks getHeistState
         ts <- liftIO $ fmap modifier $ readMVar tsMVar
@@ -111,11 +113,8 @@ instance HasHeistState s m => MonadHeist (ReaderT s m) m where
 class MonadSnap m => HasHeistState s m | s -> m where
     getHeistState :: s -> HeistState m
     setHeistState :: HeistState m -> s -> s
-
-
-------------------------------------------------------------------------------
-modifyHeistState :: HasHeistState s m => (HeistState m -> HeistState m) -> s -> s
-modifyHeistState f s = setHeistState (f $ getHeistState s) s
+    modifyHeistState :: (HeistState m -> HeistState m) -> s -> s
+    modifyHeistState f s = setHeistState (f $ getHeistState s) s
 
 
 ------------------------------------------------------------------------------

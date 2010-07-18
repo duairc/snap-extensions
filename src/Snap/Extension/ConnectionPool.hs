@@ -4,18 +4,18 @@
 
 {-|
 
-'Snap.Extension.DBPool' provides your application with database connections
+'Snap.Extension.ConnectionPool' provides your application with database connections
 managed by a pool. It extends your monad with the 'withConnection' operation.
 
 This extension does not depend on any other extensions.
 
 -}
 
-module Snap.Extension.DBPool
-  ( MonadDBPool(..)
-  , HasDBPoolState(..)
-  , DBPoolState
-  , dbPoolRunner
+module Snap.Extension.ConnectionPool
+  ( MonadConnectionPool(..)
+  , HasConnectionPoolState(..)
+  , ConnectionPoolState
+  , connectionPoolRunner
   ) where
 
 import           Control.Concurrent.Chan
@@ -33,40 +33,41 @@ data Connection = forall c. IConnection c => Connection c
 
 
 ------------------------------------------------------------------------------
-class MonadSnap m => MonadDBPool m where
+class MonadSnap m => MonadConnectionPool m where
     -- | Given an action, wait for an available connection from the pool and
     -- execute the action. Return the result.
     withConnection :: (forall c. IConnection c => c -> IO a) -> m a
 
 
 ------------------------------------------------------------------------------
-instance HasDBPoolState s => MonadDBPool (SnapExtend s) where
+instance HasConnectionPoolState s => MonadConnectionPool (SnapExtend s) where
     withConnection f = do
-        (DBPoolState mkConn chan _) <- asks getDBPoolState
+        (ConnectionPoolState mkConn chan _) <- asks getConnectionPoolState
         conn@(Connection c) <- liftIO $ readChan chan >>= maybe mkConn return
         liftIO $ f c `finally` (commit c >> writeChan chan (Just conn))
 
 
 ------------------------------------------------------------------------------
-class HasDBPoolState s where
-    getDBPoolState :: s -> DBPoolState
-    setDBPoolState :: DBPoolState -> s -> s
+class HasConnectionPoolState s where
+    getConnectionPoolState :: s -> ConnectionPoolState
+    setConnectionPoolState :: ConnectionPoolState -> s -> s
 
 
 ------------------------------------------------------------------------------
 -- | A pool of database connections. This stores the 'IO' action for opening
 -- new database connections, and a pool of (possibly unopened) connections.
-data DBPoolState = DBPoolState (IO Connection) (Chan (Maybe Connection)) Int
+data ConnectionPoolState
+    = ConnectionPoolState (IO Connection) (Chan (Maybe Connection)) Int
 
 
 ------------------------------------------------------------------------------
-instance RunnerState DBPoolState where
-    extensionId                         = const "Snap.Extension.DBPool"
+instance RunnerState ConnectionPoolState where
+    extensionId = const "Snap.Extension.ConnectionPool"
 
-    mkCleanup (DBPoolState _ chan size) = replicateM_ size $ do
+    mkCleanup (ConnectionPoolState _ chan size) = replicateM_ size $ do
         readChan chan >>= maybe (return ()) (\(Connection c) -> disconnect c)
 
-    mkReload (DBPoolState _ chan size)  = replicateM_ size $ do
+    mkReload (ConnectionPoolState _ chan size)  = replicateM_ size $ do
         readChan chan >>= maybe (return ()) (\(Connection c) -> disconnect c)
         writeChan chan Nothing
 
@@ -77,8 +78,9 @@ instance RunnerState DBPoolState where
 -- it will go round-robin through the connection pool to create them. 
 -- This should suffice for both production (one pool for all requests until
 -- server shutdown) and development (one pool per request) cases.
-dbPoolRunner :: IConnection a => IO a -> Int -> Runner DBPoolState
-dbPoolRunner mkConn size = do
+connectionPoolRunner :: IConnection a
+                     => IO a -> Int -> Runner ConnectionPoolState
+connectionPoolRunner mkConn size = do
     chan <- liftIO newChan
     liftIO $ replicateM_ size $ writeChan chan Nothing
-    mkRunner $ DBPoolState (mkConn >>= return . Connection) chan size
+    mkRunner $ ConnectionPoolState (mkConn >>= return . Connection) chan size

@@ -23,7 +23,7 @@ Library
 
   exposed-modules:
     Snap.Extension,
-    Snap.Extension.DBPool,
+    Snap.Extension.ConnectionPool,
     Snap.Extension.Heist,
     Snap.Extension.Less,
     Snap.Extension.Timer,
