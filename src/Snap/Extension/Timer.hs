@@ -1,77 +1,40 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 {-|
 
-'Snap.Extension.Timer' is a trivial Snap extension which adds the operation
-'startTime' to your application's monad which simply returns the time at which
-the application was last loaded.
+'Snap.Extension.Timer' exports the 'MonadTimer' interface which allows you to
+keep track of the time at which your application was started. The interface's
+only operation is 'startTime'.
 
 Two splices, 'startTimeSplice' and 'currentTimeSplice' are also provided, for
 your convenience.
 
-This extension does not depend on any other extensions.
+'Snap.Extension.Timer.Timer' contains the only implementation of this
+interface and can be used to turn your application's monad into a
+'MonadTimer'.
+
+More than anything else, this is intended to serve as an example Snap
+Extension to any developer wishing to write their own Snap Extension.
 
 -}
 
 module Snap.Extension.Timer
   ( MonadTimer(..)
-  , HasTimerState(..)
-  , TimerState
-  , timerRunner
   , startTimeSplice
   , currentTimeSplice
   ) where
 
-import           Control.Applicative
-import           Control.Monad
-import           Control.Monad.Reader
 import           Control.Monad.Trans
 import qualified Data.ByteString.UTF8 as U
 import           Data.Time.Clock
-import           Snap.Extension
 import           Snap.Types
 import           Text.Templating.Heist
 import           Text.XML.Expat.Tree hiding (Node)
 
 
 ------------------------------------------------------------------------------
--- | The 'MonadTimer' typeclass. It contains the 'startTime' function.
+-- | The 'MonadTimer' type class. Minimal complete definition: 'startTime'.
 class MonadSnap m => MonadTimer m where
     -- | The time at which your application was last loaded.
     startTime :: m UTCTime
-
-
-------------------------------------------------------------------------------
-instance HasTimerState s => MonadTimer (SnapExtend s) where
-    startTime = do
-        (TimerState t) <- asks getTimerState
-        return t
-
-
-------------------------------------------------------------------------------
-class HasTimerState s where
-    getTimerState :: s -> TimerState
-    setTimerState :: TimerState -> s -> s
-
-
-------------------------------------------------------------------------------
--- | A simple wrapper around a 'UTCTime' containing the start time.
-newtype TimerState = TimerState UTCTime
-
-
-------------------------------------------------------------------------------
-instance RunnerState TimerState where
-    extensionId = const "Snap.Extension.Timer"
-    mkCleanup   = const $ return ()
-    mkReload    = const $ return ()
-
-
-------------------------------------------------------------------------------
--- | The runner for the Timer extension.
-timerRunner :: Runner TimerState
-timerRunner = do
-    time <- liftIO getCurrentTime
-    mkRunner $ TimerState time
 
 
 ------------------------------------------------------------------------------

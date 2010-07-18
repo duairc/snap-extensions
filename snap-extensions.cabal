@@ -24,11 +24,18 @@ Library
   exposed-modules:
     Snap.Extension,
     Snap.Extension.ConnectionPool,
+    Snap.Extension.ConnectionPool.ConnectionPool,
     Snap.Extension.Heist,
+    Snap.Extension.Heist.Heist,
     Snap.Extension.Less,
+    Snap.Extension.Less.Less,
     Snap.Extension.Timer,
+    Snap.Extension.Timer.Timer,
     Snap.Extension.Server,
     Snap.Extension.Server.Hint
+
+  other-modules:
+    Snap.Extension.Utils
 
   build-depends:
     base >= 4 && < 5,
