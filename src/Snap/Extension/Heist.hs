@@ -1,3 +1,7 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 {-|
@@ -44,7 +48,7 @@ import           Text.Templating.Heist.Splices.Static
 ------------------------------------------------------------------------------
 -- | The 'MonadHeist' typeclass. It adds the operations 'render',
 -- 'heistLocal', 'heistServe' and 'heistServeSingle' to your monad.
-class MonadSnap m => MonadHeist m where
+class (MonadSnap m, Monad n) => MonadHeist m n | m -> n where
     -- | Renders a template as text\/html. If the given template is not found,
     -- this returns 'empty'.
     render     :: ByteString -> m ()
@@ -54,29 +58,29 @@ class MonadSnap m => MonadHeist m where
     -- action. To do that you would do:
     --
     -- > heistLocal (bindSplices mySplices) $ render "myTemplate"
-    heistLocal :: (TemplateState m -> TemplateState m) -> m a -> m a
+    heistLocal :: (TemplateState n -> TemplateState n) -> m a -> m a
 
 
 ------------------------------------------------------------------------------
 -- | Analogous to 'fileServe'. If the template specified in the request path
 -- is not found, it returns 'empty'.
-heistServe :: MonadHeist m => m ()
+heistServe :: MonadHeist m n => m ()
 heistServe = render . U.fromString =<< getSafePath
 
 
 ------------------------------------------------------------------------------
 -- | Analogous to 'fileServeSingle'. If the given template is not found, this
 -- throws an error.
-heistServeSingle :: MonadHeist m => ByteString -> m ()
+heistServeSingle :: MonadHeist m n => ByteString -> m ()
 heistServeSingle t = render t <|>
                      error ("Template \"" ++ U.toString t ++ "\" not found.")
 
 
 ------------------------------------------------------------------------------
-instance HasHeistState s => MonadHeist (SnapExtend s) where
+instance HasHeistState s (SnapExtend s) => MonadHeist (SnapExtend s) (SnapExtend s) where
     render t     = do
         (HeistState _ _ tsMVar _ modifier) <- asks getHeistState
-        ts <- return . modifier =<< (liftIO $ readMVar tsMVar)
+        ts <- liftIO $ fmap modifier $ readMVar tsMVar
         mt <- renderTemplate ts t
         flip (maybe pass) mt $ \html -> do
             modifyResponse $ setContentType "text/html; charset=utf-8"
@@ -88,16 +92,29 @@ instance HasHeistState s => MonadHeist (SnapExtend s) where
 
 
 ------------------------------------------------------------------------------
-class HasHeistState s where
-    getHeistState :: s -> HeistState (SnapExtend s)
-    setHeistState :: HeistState (SnapExtend s) -> s -> s
+instance HasHeistState s m => MonadHeist (ReaderT s m) m where
+    render t     = ReaderT $ \s -> do
+        let (HeistState _ _ tsMVar _ modifier) = getHeistState s
+        ts <- liftIO $ fmap modifier $ readMVar tsMVar
+        mt <- renderTemplate ts t
+        flip (maybe pass) mt $ \html -> do
+            writeBS html
+            modifyResponse
+                $ setContentType "text/html; charset=utf-8"
+                . setContentLength (fromIntegral $ B.length html)
+
+    heistLocal f = local $ modifyHeistState $ \s ->
+        s { _modifier = f . _modifier s }
 
 
 ------------------------------------------------------------------------------
-modifyHeistState :: HasHeistState s
-                 => (HeistState (SnapExtend s) -> HeistState (SnapExtend s))
-                 -> s
-                 -> s
+class MonadSnap m => HasHeistState s m | s -> m where
+    getHeistState :: s -> HeistState m
+    setHeistState :: HeistState m -> s -> s
+
+
+------------------------------------------------------------------------------
+modifyHeistState :: HasHeistState s m => (HeistState m -> HeistState m) -> s -> s
 modifyHeistState f s = setHeistState (f $ getHeistState s) s
 
 
