@@ -52,7 +52,7 @@ timerRunner = liftIO getCurrentTime >>= mkRunner . TimerState
 
 ------------------------------------------------------------------------------
 instance RunnerState TimerState where
-    extensionId = const "Snap.Extension.Timer"
+    extensionId = const "Timer/Timer"
     mkCleanup   = const $ return ()
     mkReload    = const $ return ()
 

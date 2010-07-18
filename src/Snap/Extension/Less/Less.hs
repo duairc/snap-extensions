@@ -62,7 +62,7 @@ class HasLessState s where
 
 ------------------------------------------------------------------------------
 instance RunnerState LessState where
-    extensionId = const "Snap.Extension.Less"
+    extensionId = const "Less/Less"
     mkCleanup   = const $ return ()
     mkReload (LessState d m) = modifyMVar_ m $ const $ loadStylesheets d
 
