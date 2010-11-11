@@ -5,7 +5,7 @@
 {-|
 
 This module provides replacements for the 'httpServe' and 'quickHttpServe'
-functions exported by 'Snap.Http.Server'. By taking a 'Runner' as an argument,
+functions exported by 'Snap.Http.Server'. By taking a 'Initializer' as an argument,
 these functions simplify the glue code that is needed to use Snap Extensions.
 In particular, 'Snap.Extension.Server.Hint' provides function with identical
 type signatures to the ones exported by this module, but which dynamically
@@ -107,17 +107,16 @@ completeConfig = mappend defaultConfig
 -- the HTTP server, kill the controlling thread.
 httpServe :: ConfigExtend s
           -- ^ Any configuration options which override the defaults
-          -> Runner s
-          -- ^ The 'Runner' function for the application's monad
+          -> Initializer s
+          -- ^ The 'Initializer' function for the application's monad
           -> SnapExtend s ()
           -- ^ The application to be served
           -> IO ()
-httpServe config runner handler = do
+httpServe config init handler = do
     (state, mkCleanup, mkSnap) <-
-        runRunnerHint verbose runner (catch500 handler) reloader
+        runInitializerHint verbose init (catch500 handler) reloader
 #ifdef HINT
-    (cleanup, snap) <-
-        $(loadSnapTH 'state 'mkCleanup 'mkSnap)
+    (cleanup, snap) <- $(loadSnapTH 'state 'mkCleanup 'mkSnap)
 #else
     (cleanup, snap) <- fmap (mkCleanup &&& mkSnap) state
 #endif
@@ -145,8 +144,8 @@ httpServe config runner handler = do
 -- | Starts serving HTTP using the given handler. The configuration is read
 -- from the options given on the command-line, as returned by
 -- 'commandLineConfig'.
-quickHttpServe :: Runner s
-               -- ^ The 'Runner' function for the application's monad
+quickHttpServe :: Initializer s
+               -- ^ The 'Initializer' function for the application's monad
                -> SnapExtend s ()
                -- ^ The application to be served
                -> IO ()

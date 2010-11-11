@@ -7,7 +7,7 @@ interface defined in 'Snap.Extension.Timer'.
 
 As always, to use, add 'TimerState' to your application's state, along with an
 instance of 'HasTimerState' for your application's state, making sure to use a
-'timerRunner' in your application's 'Runner', and then you're ready to go.
+'timerInitializer' in your application's 'Initializer', and then you're ready to go.
 
 This implementation does not require that your application's monad implement
 interfaces from any other Snap Extension.
@@ -17,7 +17,7 @@ interfaces from any other Snap Extension.
 module Snap.Extension.Timer.Timer
   ( TimerState
   , HasTimerState(..)
-  , timerRunner
+  , timerInitializer
   ) where
 
 import           Control.Monad.Reader
@@ -45,13 +45,13 @@ class HasTimerState s where
 
 
 ------------------------------------------------------------------------------
--- | The runner for 'TimerState'. No arguments are required.
-timerRunner :: Runner TimerState
-timerRunner = liftIO getCurrentTime >>= mkRunner . TimerState
+-- | The Initializer for 'TimerState'. No arguments are required.
+timerInitializer :: Initializer TimerState
+timerInitializer = liftIO getCurrentTime >>= mkInitializer . TimerState
 
 
 ------------------------------------------------------------------------------
-instance RunnerState TimerState where
+instance InitializerState TimerState where
     extensionId = const "Timer/Timer"
     mkCleanup   = const $ return ()
     mkReload    = const $ return ()

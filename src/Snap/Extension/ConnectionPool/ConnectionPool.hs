@@ -8,12 +8,12 @@
 
 As always, to use, add 'ConnectionPoolState' to your application's state,
 along with an instance of 'HasConnectionPoolState' for your application's
-state, making sure to use a 'connectionPoolRunner' in your application's
-'Runner', and then you're ready to go.
+state, making sure to use a 'connectionPoolInitializer' in your application's
+'Initializer', and then you're ready to go.
 
 The 'ConnectionPoolState' has a maximum size associated with it, but it won't
 not get filled up until necessary. It will not create actual connections until
-requested, it will go round-robin through the connection pool to create them. 
+requested, it will go round-robin through the connection pool to create them.
 This should suffice for both production (one pool for all requests until
 server shutdown) and development (one pool per request) cases.
 
@@ -25,7 +25,7 @@ interfaces from any other Snap Extension.
 module Snap.Extension.ConnectionPool.ConnectionPool
   ( HasConnectionPoolState(..)
   , ConnectionPoolState
-  , connectionPoolRunner
+  , connectionPoolInitializer
   ) where
 
 import           Control.Concurrent.Chan
@@ -66,23 +66,22 @@ data ConnectionPoolState = ConnectionPoolState
 class HasConnectionPoolState s where
     getConnectionPoolState :: s -> ConnectionPoolState
     setConnectionPoolState :: ConnectionPoolState -> s -> s
-   
 
 
 ------------------------------------------------------------------------------
--- | The 'Runner' for 'ConnectionPoolState'. It takes two arguments, an 'IO'
--- action which creates an instance of 'IConnection', and the desired maximum
--- size of the pool.
-connectionPoolRunner :: IConnection a
-                     => IO a -> Int -> Runner ConnectionPoolState
-connectionPoolRunner mkConn size = do
+-- | The 'Initializer' for 'ConnectionPoolState'. It takes two arguments, an
+-- 'IO' action which creates an instance of 'IConnection', and the desired
+-- maximum size of the pool.
+connectionPoolInitializer :: IConnection a
+                          => IO a -> Int -> Initializer ConnectionPoolState
+connectionPoolInitializer mkConn size = do
     chan <- liftIO newChan
     liftIO $ replicateM_ size $ writeChan chan Nothing
-    mkRunner $ ConnectionPoolState (mkConn >>= return . Connection) chan size
+    mkInitializer $ ConnectionPoolState (mkConn >>= return . Connection) chan size
 
 
 ------------------------------------------------------------------------------
-instance RunnerState ConnectionPoolState where
+instance InitializerState ConnectionPoolState where
     extensionId = const "ConnectionPool/ConnectionPool"
 
     mkCleanup (ConnectionPoolState _ chan size) = replicateM_ size $ do
@@ -95,15 +94,16 @@ instance RunnerState ConnectionPoolState where
 
 ------------------------------------------------------------------------------
 instance HasConnectionPoolState s => MonadConnectionPool (SnapExtend s) where
-    withConnection f = do
-        (ConnectionPoolState mkConn chan _) <- asks getConnectionPoolState
-        conn@(Connection c) <- liftIO $ readChan chan >>= maybe mkConn return
-        liftIO $ f c `finally` (commit c >> writeChan chan (Just conn))
+    withConnection f = asks getConnectionPoolState >>= withConnectionFromPool f
 
 
 ------------------------------------------------------------------------------
 instance (MonadSnap m, HasConnectionPoolState s) => MonadConnectionPool (ReaderT s m) where
-    withConnection f = do
-        (ConnectionPoolState mkConn chan _) <- asks getConnectionPoolState
-        conn@(Connection c) <- liftIO $ readChan chan >>= maybe mkConn return
-        liftIO $ f c `finally` (commit c >> writeChan chan (Just conn))
+    withConnection f = asks getConnectionPoolState >>= withConnectionFromPool f
+
+
+------------------------------------------------------------------------------
+instance IsConnectionPoolState ConnectionPoolState where
+    withConnectionFromPool f (ConnectionPoolState mkConn chan _) = liftIO $ do
+        conn@(Connection c) <- readChan chan >>= maybe mkConn return
+        f c `finally` (commit c >> writeChan chan (Just conn))

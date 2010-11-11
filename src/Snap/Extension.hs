@@ -3,11 +3,11 @@
 
 module Snap.Extension
   ( SnapExtend
-  , Runner
-  , RunnerState(..)
-  , runRunner
-  , runRunnerHint
-  , mkRunner
+  , Initializer
+  , InitializerState(..)
+  , runInitializer
+  , runInitializerHint
+  , mkInitializer
   , defaultReloadHandler
   , nullReloadHandler
   ) where
@@ -48,16 +48,36 @@ newtype SnapExtend s a = SnapExtend (ReaderT s Snap a)
 
 
 ------------------------------------------------------------------------------
--- | The 'Runner' monad. This can be used for constructing values which also
--- have cleanup\/destroy and reload functions.
-newtype Runner s = Runner
-    (Bool -> IO (Either s (s, IO (), IO [(ByteString, Maybe ByteString)])))
+-- | The 'SCR' datatype is used internally by the 'Initializer' monad to store
+-- the application's state, cleanup actions and reload actions.
+data SCR s = SCR
+    { _state   :: s
+      -- ^ The internal state of the application's Snap Extensions.
+    , _cleanup :: IO ()
+      -- ^ IO action which when run will cleanup the application's state,
+      -- e.g., closing open connections.
+    , _reload  :: IO [(ByteString, Maybe ByteString)]
+      -- ^ IO action which when run will reload the application's state, e.g.,
+      -- refreshing any cached values stored in the state.
+      --
+      -- It returns a list of tuples whose \"keys\" are the names of the Snap
+      -- Extensions which were reloaded and whose \"values\" are @Nothing@
+      -- when run successfully and @Just x@ on failure, where @x@ is an error
+      -- message.
+    }
 
 
 ------------------------------------------------------------------------------
--- | Values of types which are instances of 'RunnerState' have
+-- | The 'Initializer' monad. The code that initialises your application's
+-- state is written in the 'Initializer' monad. It's used for constructing
+-- values which have cleanup\/destroy and reload actions associated with them.
+newtype Initializer s = Initializer (Bool -> IO (Either s (SCR s)))
+
+
+------------------------------------------------------------------------------
+-- | Values of types which are instances of 'InitializerState' have
 -- cleanup\/destroy and reload actions associated with them.
-class RunnerState s where
+class InitializerState s where
     extensionId :: s -> ByteString
     mkCleanup   :: s -> IO ()
     mkReload    :: s -> IO ()
@@ -65,17 +85,18 @@ class RunnerState s where
 
 ------------------------------------------------------------------------------
 -- | Although it has the same type signature, this is not the same as 'return'
--- in the 'Runner' monad. Return simply lifts a value into the 'Runner' monad,
--- but this lifts the value and its destroy\/reload actions. Use this when
--- making your own 'Runner' actions.
-mkRunner :: RunnerState s => s -> Runner s
-mkRunner s = Runner $ \v -> setup v $ Right (s, cleanup v, reload v)
+-- in the 'Initializer' monad. Return simply lifts a value into the
+-- 'Initializer' monad, but this lifts the value and its destroy\/reload
+-- actions. Use this when making your own 'Initializer' actions.
+mkInitializer :: InitializerState s => s -> Initializer s
+mkInitializer s = Initializer $ \v -> setup v $ Right $ mkSCR v
   where
     handler          :: SomeException -> IO (Maybe ByteString)
     handler e        = return $ Just $ U.fromString $ show e
     maybeCatch m     = (m >> return Nothing) `catch` handler
     maybeToMsg       = maybe " done." $ const " failed."
     name             = U.toString $ extensionId s
+    mkSCR v          = SCR s (cleanup v) (reload v)
     cleanup v        = do
         when v $ hPutStr stderr $ "Cleaning up " ++ name ++ "..."
         m <- maybeCatch $ mkCleanup s
@@ -91,81 +112,82 @@ mkRunner s = Runner $ \v -> setup v $ Right (s, cleanup v, reload v)
 
 
 ------------------------------------------------------------------------------
--- | Given the runner for your application's state, and a value in the monad
--- formed by 'SnapExtend' wrapped it, this returns a 'Snap' action, a cleanup
--- action and a reload action.
-runRunner :: Bool
-          -- ^ Verbosity; info is printed to 'stderr' when this is 'True'
-          -> Runner s
-          -- ^ The Runner value
-          -> SnapExtend s ()
-          -- ^ An action in your application's monad
-          -> IO (Snap (), IO (), IO [(ByteString, Maybe ByteString)])
-          -- ^ This is documented thoroughly in the README
-runRunner v (Runner r) (SnapExtend m) = r v >>= \e -> case e of
-    Left s          -> return (runReaderT m s, return (), return [])
-    Right (s, a, b) -> return (runReaderT m s, a, b)
+-- | Given the Initializer for your application's state, and a value in the
+-- monad formed by 'SnapExtend' wrapped it, this returns a 'Snap' action, a
+-- cleanup action and a reload action.
+runInitializer :: Bool
+               -- ^ Verbosity; info is printed to 'stderr' when this is 'True'
+               -> Initializer s
+               -- ^ The Initializer value
+               -> SnapExtend s ()
+               -- ^ An action in your application's monad
+               -> IO (Snap (), IO (), IO [(ByteString, Maybe ByteString)])
+               -- ^ This is documented thoroughly in the README
+runInitializer v (Initializer r) (SnapExtend m) = r v >>= \e -> case e of
+    Left s            -> return (runReaderT m s, return (), return [])
+    Right (SCR s a b) -> return (runReaderT m s, a, b)
 
 
 ------------------------------------------------------------------------------
--- | Serves the same purpose as 'runRunner', but can be used with Hint. This
--- is explained in the README.
-runRunnerHint :: Bool
-              -- ^ Verbosity; info is printed to 'stderr' when this is 'True'
-              -> Runner s
-              -- ^ The Runner value
-              -> SnapExtend s ()
-              -- ^ An action in your application's monad.
-              -> (IO [(ByteString, Maybe ByteString)] -> SnapExtend s ())
-              -- ^ See README and 'defaultReloadHandler'
-              -> IO (IO s, s -> IO (), s -> Snap ())
-              -- ^ A tuple of values which can be passed to @loadSnapTH@.
-runRunnerHint v (Runner r) se@(SnapExtend m) f = r v >>= \e -> case e of
-    Left s          -> return (return s, const $ return (), runReaderT m)
-    Right (s, a, b) -> let (SnapExtend m') = f b <|> se
-                       in return (return s, const a, runReaderT m')
+-- | Serves the same purpose as 'runInitializer', but can be used with Hint.
+-- This is explained in the README.
+runInitializerHint :: Bool
+                   -- ^ Verbosity; info is printed to 'stderr' when this is
+                   -- 'True'
+                   -> Initializer s
+                   -- ^ The Initializer value
+                   -> SnapExtend s ()
+                   -- ^ An action in your application's monad.
+                   -> (IO [(ByteString, Maybe ByteString)] -> SnapExtend s ())
+                   -- ^ See README and 'defaultReloadHandler'
+                   -> IO (IO s, s -> IO (), s -> Snap ())
+                   -- ^ A tuple of values which can be passed to @loadSnapTH@.
+runInitializerHint v (Initializer r) se@(SnapExtend m) f = r v >>= \e -> case e of
+    Left s            -> return (return s, const $ return (), runReaderT m)
+    Right (SCR s a b) -> let (SnapExtend m') = f b <|> se
+                         in return (return s, const a, runReaderT m')
 
 
 ------------------------------------------------------------------------------
-instance Functor Runner where
-    fmap f (Runner r) = Runner $ \v -> r v >>= \e -> return $ case e of
-        Left s          -> Left $ f s
-        Right (s, a, b) -> Right (f s, a, b)
+instance Functor Initializer where
+    fmap f (Initializer r) = Initializer $ \v -> r v >>= \e -> return $ case e of
+        Left s            -> Left $ f s
+        Right (SCR s a b) -> Right $ SCR (f s) a b
 
 
 ------------------------------------------------------------------------------
-instance Applicative Runner where
+instance Applicative Initializer where
     pure  = return
     (<*>) = ap
 
 
 ------------------------------------------------------------------------------
-instance Monad Runner where
-    return   = Runner . const . return . Left
+instance Monad Initializer where
+    return   = Initializer . const . return . Left
     a >>= f  = join' $ fmap f a
 
 
 ------------------------------------------------------------------------------
-instance MonadIO Runner where
-    liftIO = Runner . const . fmap Left
+instance MonadIO Initializer where
+    liftIO = Initializer . const . fmap Left
 
 
 ------------------------------------------------------------------------------
--- | Join for the 'Runner' monad. This is used in the definition of bind for
--- the 'Runner' monad.
-join' :: Runner (Runner s) -> Runner s
-join' (Runner r) = Runner $ \v -> r v >>= \e -> case e of
-    Left  (Runner r')       -> r' v
-    Right (Runner r', a, b) -> r' v >>= \e' -> return $ Right $ case e' of
-        Left  s           -> (s, a, b)
-        Right (s, a', b') -> (s, a' >> a, liftM2 (++) b b')
+-- | Join for the 'Initializer' monad. This is used in the definition of bind
+-- for the 'Initializer' monad.
+join' :: Initializer (Initializer s) -> Initializer s
+join' (Initializer r) = Initializer $ \v -> r v >>= \e -> case e of
+    Left  (Initializer r')           -> r' v
+    Right (SCR (Initializer r') a b) -> r' v >>= \e' -> return $ Right $ case e' of
+        Left  s             -> SCR s a b
+        Right (SCR s a' b') -> SCR s (a' >> a) (liftM2 (++) b b')
 
 
 ------------------------------------------------------------------------------
--- | This takes the last value of the tuple returned by 'runRunner', which is
--- a list representing the results of an attempt to reload the application's
--- Snap Extensions, and turns it into a Snap action which displays the these
--- results.
+-- | This takes the last value of the tuple returned by 'runInitializer',
+-- which is a list representing the results of an attempt to reload the
+-- application's Snap Extensions, and turns it into a Snap action which
+-- displays the these results.
 defaultReloadHandler :: MonadSnap m
                      => IO [(ByteString, Maybe ByteString)]
                      -> m ()

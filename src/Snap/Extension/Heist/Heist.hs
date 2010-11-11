@@ -11,8 +11,8 @@ interface defined in 'Snap.Extension.Heist'.
 
 As always, to use, add 'HeistState' to your application's state, along with an
 instance of 'HasHeistState' for your application's state, making sure to
-use a 'heistRunner' in your application's 'Runner', and then you're ready to
-go.
+use a 'heistInitializer' in your application's 'Initializer', and then you're
+ready to go.
 
 'Snap.Extension.Heist.Heist' is a little different to other Snap Extensions,
 which is unfortunate as it is probably the most widely useful one. As
@@ -49,7 +49,7 @@ interfaces from any other Snap Extension.
 module Snap.Extension.Heist.Heist
   ( HeistState
   , HasHeistState(..)
-  , heistRunner
+  , heistInitializer
   ) where
 
 import           Control.Applicative
@@ -111,20 +111,20 @@ class MonadSnap m => HasHeistState m s | s -> m where
 
 
 ------------------------------------------------------------------------------
--- | The 'Runner' for 'HeistState'. It takes one argument, a path to a
+-- | The 'Initializer' for 'HeistState'. It takes one argument, a path to a
 -- template directory containing @.tpl@ files.
-heistRunner :: MonadSnap m => FilePath -> Runner (HeistState m)
-heistRunner path = do
+heistInitializer :: MonadSnap m => FilePath -> Initializer (HeistState m)
+heistInitializer path = do
     heistState <- liftIO $ do
         (origTs,sts) <- bindStaticTag emptyTemplateState
         loadTemplates path origTs >>= either error (\ts -> do
             tsMVar <- newMVar ts
             return $ HeistState path origTs tsMVar sts id)
-    mkRunner heistState
+    mkInitializer heistState
 
 
 ------------------------------------------------------------------------------
-instance MonadSnap m => RunnerState (HeistState m) where
+instance MonadSnap m => InitializerState (HeistState m) where
     extensionId = const "Heist/Heist"
     mkCleanup   = const $ return ()
     mkReload (HeistState path origTs tsMVar sts _) = do

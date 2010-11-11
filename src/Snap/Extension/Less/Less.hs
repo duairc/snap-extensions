@@ -7,7 +7,7 @@ interface defined in 'Snap.Extension.Less'.
 
 As always, to use, add 'LessState' to your application's state, along with an
 instance of 'HasLessState' for your application's state, making sure to use a
-'lessRunner' in your application's 'Runner', and then you're ready to go.
+'lessInitializer' in your application's 'Initializer', and then you're ready to go.
 
 This implementation does not require that your application's monad implement
 interfaces from any other Snap Extension.
@@ -17,7 +17,7 @@ interfaces from any other Snap Extension.
 module Snap.Extension.Less.Less
   ( HasLessState(..)
   , LessState
-  , lessRunner
+  , lessInitializer
   ) where
 
 import           Control.Concurrent
@@ -61,17 +61,17 @@ class HasLessState s where
 
 
 ------------------------------------------------------------------------------
-instance RunnerState LessState where
+instance InitializerState LessState where
     extensionId = const "Less/Less"
     mkCleanup   = const $ return ()
     mkReload (LessState d m) = modifyMVar_ m $ const $ loadStylesheets d
 
 
 ------------------------------------------------------------------------------
--- | The Runner for the Less extension. It takes a path to a stylesheet
+-- | The Initializer for the Less extension. It takes a path to a stylesheet
 -- directory containing @.less@ files.
-lessRunner :: FilePath -> Runner LessState
-lessRunner path = mkRunner =<< (liftIO $
+lessInitializer :: FilePath -> Initializer LessState
+lessInitializer path = mkInitializer =<< (liftIO $
     loadStylesheets path >>= newMVar >>= return . LessState path)
 
 
