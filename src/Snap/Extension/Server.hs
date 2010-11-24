@@ -132,8 +132,9 @@ httpServe config init handler = do
     conf     = completeConfig config
     verbose  = fromJust $ getVerbose conf
     output   = when verbose . hPutStrLn stderr
-    address  = fromJust $ getAddress conf
-    port     = fromJust $ getPort conf
+    (address, port) = case (head . getListen $ conf) of
+      ListenHttp a p -> (a,p)
+      ListenHttps a p _ _ -> (a,p)
     reloader = fromJust $ getReloadHandler conf
     compress = if fromJust $ getCompression conf then withCompression else id
     catch500 = flip catch $ fromJust $ getErrorHandler conf
