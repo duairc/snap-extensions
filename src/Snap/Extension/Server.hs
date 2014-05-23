@@ -98,7 +98,10 @@ defaultConfig = setReloadHandler handler C.defaultConfig
 -- | Completes a partial 'Config' by filling in the unspecified values with
 -- the default values from 'defaultConfig'.
 completeConfig :: ConfigExtend s -> ConfigExtend s
-completeConfig = mappend defaultConfig
+completeConfig c = case getListen c' of
+                    [] -> addListen (ListenHttp "0.0.0.0" 8000) c'
+                    _ -> c'
+  where c' = mappend defaultConfig c
 
 
 ------------------------------------------------------------------------------
@@ -132,8 +135,9 @@ httpServe config init handler = do
     conf     = completeConfig config
     verbose  = fromJust $ getVerbose conf
     output   = when verbose . hPutStrLn stderr
-    address  = fromJust $ getAddress conf
-    port     = fromJust $ getPort conf
+    (address, port) = case (head . getListen $ conf) of
+      ListenHttp a p -> (a,p)
+      ListenHttps a p _ _ -> (a,p)
     reloader = fromJust $ getReloadHandler conf
     compress = if fromJust $ getCompression conf then withCompression else id
     catch500 = flip catch $ fromJust $ getErrorHandler conf
